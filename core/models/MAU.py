@@ -122,7 +122,7 @@ class RNN(nn.Module):
                 net = frames[:, t]
             else:
                 time_diff = t - self.configs.input_length
-                net = mask_true[:, time_diff] * frames[:, t] + (1 - mask_true[:, time_diff]) * x_gen
+                net = (1 - mask_true[:, time_diff]) * frames[:, t] + mask_true[:, time_diff] * x_gen
             frames_feature = net
             frames_feature_encoded = []
             for i in range(len(self.encoders)):
