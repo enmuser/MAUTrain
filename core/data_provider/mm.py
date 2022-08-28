@@ -8,7 +8,7 @@ import torch
 import torch.utils.data as data
 
 def load_mnist(root):
-    path = os.path.join(root, 'train-images-idx3-ubyte.gz')
+    path = os.path.join(root, 'train-images.idx3-ubyte')
     with gzip.open(path, 'rb') as f:
         mnist = np.frombuffer(f.read(), np.uint8, offset=16)
         mnist = mnist.reshape(-1, 28, 28)

@@ -12,6 +12,14 @@ import torch.optim.lr_scheduler as lr_scheduler
 class Model(object):
     def __init__(self, configs):
         self.configs = configs
+        # img_height = 64
+        # img_width = 64
+        # patch_size = 1
+        # patch_height = 64
+        # patch_width = 64
+        # patch_channel = 1
+        # num_layers = 4
+        # num_hidden = 64
         self.patch_height = configs.img_height // configs.patch_size
         self.patch_width = configs.img_width // configs.patch_size
         self.patch_channel = configs.img_channel * (configs.patch_size ** 2)
@@ -20,7 +28,7 @@ class Model(object):
             'mau': MAU.RNN,
             # 'stau': STAU.RNN,
             # 'aau': AAU.RNN,
-            # 'stauv2': STAUv2.RNN, 
+            # 'stauv2': STAUv2.RNN,
             # 'aauv2': AAUv2.RNN
         }
         num_hidden = []
@@ -29,6 +37,8 @@ class Model(object):
         self.num_hidden = num_hidden
         if configs.model_name in networks_map:
             Network = networks_map[configs.model_name]
+            # 生成网络并放入GPU
+            # 输入： 4, [64,64,64,64], configs
             self.network = Network(self.num_layers, self.num_hidden, configs).to(configs.device)
         else:
             raise ValueError('Name of network unknown %s' % configs.model_name)
@@ -36,6 +46,7 @@ class Model(object):
         # for param_tensor in self.network.state_dict():  # 字典的遍历默认是遍历 key，所以param_tensor实际上是键值
         #     print(param_tensor, '\t', self.network.state_dict()[param_tensor].size())
         self.optimizer = Adam(self.network.parameters(), lr=configs.lr)
+        # lr_decay = 0.90
         self.scheduler = lr_scheduler.ExponentialLR(self.optimizer, gamma=configs.lr_decay)
 
         self.MSE_criterion = nn.MSELoss()
@@ -53,11 +64,22 @@ class Model(object):
         self.network.load_state_dict(stats['net_param'])
 
     def train(self, data, mask, itr):
+        # data = imgs = 16 * 20 * 1 * 64 * 64
+        # mask = real_input_flag = 16 * 9 * 64 * 64 * 1
+        # frames = data = imgs = 16 * 20 * 1 * 64 * 64
         frames = data
+        # 开启训练模式
         self.network.train()
+        # 将数据转换成tensor并转存到device中 即，GPU中
         frames_tensor = torch.FloatTensor(frames).to(self.configs.device)
         mask_tensor = torch.FloatTensor(mask).to(self.configs.device)
 
+        # 进入搭建network进行数据训练
+        # 输入的是
+        # 1.frames_tensor 图片信息 16 * 20 * 1 * 64 * 64
+        # 2. mask_tensor real_input_flag掩码信息 16 * 9 * 64 * 64 * 1
+        # 输出的是
+        # next_frames 16 * 19 * 1 * 64 * 64
         next_frames = self.network(frames_tensor, mask_tensor)
         ground_truth = frames_tensor
 
@@ -72,6 +94,7 @@ class Model(object):
         loss_gen.backward()
         self.optimizer.step()
 
+        # sampling_stop_iter=50000, delay_interval=2000
         if itr >= self.configs.sampling_stop_iter and itr % self.configs.delay_interval == 0:
             self.scheduler.step()
             # self.scheduler_F.step()

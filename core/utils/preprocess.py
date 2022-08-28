@@ -22,23 +22,39 @@ def reshape_patch(img_tensor, patch_size):
 
 
 def reshape_patch_back(patch_tensor, patch_size):
+    # patch_tensor = test_ims = 16 * 20 * 64 * 64 * 1, patch_size = 1
     # B L H W C
+    # tensor.ndim 获取 tensor的维度
     assert 5 == patch_tensor.ndim
+    # batch_size = 16
     batch_size = np.shape(patch_tensor)[0]
+    # seq_length = 20
     seq_length = np.shape(patch_tensor)[1]
+    # patch_height = 64
     patch_height = np.shape(patch_tensor)[2]
+    # patch_width = 64
     patch_width = np.shape(patch_tensor)[3]
+    # channels = 1
     channels = np.shape(patch_tensor)[4]
+    # img_channels = 1 // (1 * 1) = 1
     img_channels = channels // (patch_size * patch_size)
+    # a = [batch_size, seq_length,patch_height, patch_width,patch_size, patch_size,img_channels]
+    # a = [16, 20, 64, 64, 1, 1, 1] <- 16 * 20 * 64 * 64 * 1
     a = np.reshape(patch_tensor, [batch_size, seq_length,
                                   patch_height, patch_width,
                                   patch_size, patch_size,
                                   img_channels])
+    # b = a = 16 * 20 * 64 * 64 * 1 * 1 * 1 -> 16 * 20 * 64 * 1 * 64 * 1 * 1
+    #          0    1    2    3   4   5   6 ->  0,   1,   2,   4,  3,  5,  6
+    # b = 16 * 20 * 64 * 1 * 64 * 1 * 1
     b = np.transpose(a, [0, 1, 2, 4, 3, 5, 6])
+    # img_tensor = [batch_size, seq_length, patch_height * patch_size, patch_width * patch_size, img_channels]
+    # img_tensor = [16, 20, 64, 64, 1] <- b = 16 * 20 * 64 * 1 * 64 * 1 * 1
     img_tensor = np.reshape(b, [batch_size, seq_length,
                                 patch_height * patch_size,
                                 patch_width * patch_size,
                                 img_channels])
+    # img_tensor = 16 * 20 * 64 * 64 * 1
     return img_tensor
 
 
