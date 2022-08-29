@@ -42,7 +42,7 @@ class MAUCell(nn.Module):
         )
         self.softmax = nn.Softmax(dim=0)
 
-    def forward(self, T_t, S_t, t_att, s_att):
+    def forward(self, T_t, S_t, t_att, s_att, st_att):
         # T_t => T(k,t-1) 当前时间特征
         # S_t => S(k-1,t) 当前空间特征
         # t_att => T(k,t-tau:t-1)
@@ -60,7 +60,18 @@ class MAUCell(nn.Module):
         weights_list = torch.stack(weights_list, dim=0)
         weights_list = torch.reshape(weights_list, (*weights_list.shape, 1, 1, 1))
         weights_list = self.softmax(weights_list)
-        T_trend = t_att * weights_list
+
+        # 计算注意分数权重
+        weights_list_st = []
+        for i in range(self.tau):
+            # tau = τ = 5
+            # qi的计算 当前空间特征卷积操作的结果 与 历史前τ个进行Hadamard乘积
+            weights_list_st.append((st_att[i] * s_next).sum(dim=(1, 2, 3)) / math.sqrt(self.d))
+        weights_list_st = torch.stack(weights_list_st, dim=0)
+        weights_list_st = torch.reshape(weights_list_st, (*weights_list_st.shape, 1, 1, 1))
+        weights_list_st = self.softmax(weights_list_st)
+
+        T_trend = t_att * weights_list + t_att * weights_list_st
         # T_trend = T_att 长期运动信息
         T_trend = T_trend.sum(dim=0)
         # t_att_gate = Uf 融合门

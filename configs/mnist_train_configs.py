@@ -52,4 +52,5 @@ def configs():
     parser.add_argument('--sampling_stop_iter', type=int, default=50000)
     parser.add_argument('--sampling_start_value', type=float, default=1.0)
     parser.add_argument('--sampling_changing_rate', type=float, default=0.00002)
+    parser.add_argument('--sampling_distance', type=int, default=2)
     return parser

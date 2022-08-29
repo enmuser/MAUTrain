@@ -139,11 +139,13 @@ class RNN(nn.Module):
         T_t = []
         T_pre = []
         S_pre = []
+        ST_pre = []
         x_gen = None
         # num_layers = 0, 1, 2, 3
         for layer_idx in range(self.num_layers):
             tmp_t = []
             tmp_s = []
+            tmp_st = []
             if layer_idx == 0:
                 # in_channel = 64
                 in_channel = self.num_hidden[layer_idx]
@@ -154,8 +156,10 @@ class RNN(nn.Module):
             for i in range(self.tau):
                 tmp_t.append(torch.zeros([batch_size, in_channel, height, width]).to(self.configs.device))# 16 * 64 * 16 * 16
                 tmp_s.append(torch.zeros([batch_size, in_channel, height, width]).to(self.configs.device))# 16 * 64 * 16 * 16
+                tmp_st.append(torch.zeros([batch_size, in_channel, height, width]).to(self.configs.device))  # 16 * 64 * 16 * 16
             T_pre.append(tmp_t) # 4 * 5 * 16 * 64 * 16 * 16
             S_pre.append(tmp_s) # 4 * 5 * 16 * 64 * 16 * 16
+            ST_pre.append(tmp_st) # 4 * 5 * 16 * 64 * 16 * 16
         # total_length = 20,  0,1,2,3,......,16,17,18
         for t in range(self.configs.total_length - 1):
             # input_length = 10
@@ -198,7 +202,11 @@ class RNN(nn.Module):
                 s_att = S_pre[i][-self.tau:]
                 s_att = torch.stack(s_att, dim=0) # 5 * 16 * 64 * 16 * 16
                 S_pre[i].append(S_t)
-                T_t[i], S_t = self.cell_list[i](T_t[i], S_t, t_att, s_att)
+                st_att = ST_pre[i][-self.tau:]
+                st_att = torch.stack(st_att, dim=0)
+                if t % self.configs.sampling_distance == 0:
+                    ST_pre[i].append(S_t)
+                T_t[i], S_t = self.cell_list[i](T_t[i], S_t, t_att, s_att, st_att)
                 T_pre[i].append(T_t[i])
             out = S_t
             # out = self.merge(torch.cat([T_t[-1], S_t], dim=1))
