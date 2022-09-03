@@ -199,7 +199,7 @@ class RNN(nn.Module):
                     zeros = torch.zeros([batch_size, self.num_hidden[i] * 4, height, width]).to(self.configs.device) # 16 * 64 * 16 * 16
                     T_t.append(zeros)# 4 * 16 * 64 * 16 * 16
             S_t = frames_feature # 16 * 64 * 16 * 16
-            S_t = S_t.reshape(16, 1, 64, 16, 16)
+            S_t = S_t.reshape(batch_size, 1, 64, 16, 16)
             S_t, skips = self.inception_encoder(S_t)
             # num_layers = 4
             # 0, 1, 2, 3
