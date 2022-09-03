@@ -14,35 +14,35 @@ class MAUCell(nn.Module):
         self.padding = (filter_size[0] // 2, filter_size[1] // 2)
         self.cell_mode = cell_mode
         # d = 64 * 16 * 16 = 16384
-        self.d = num_hidden * height * width
+        self.d = num_hidden * 4 * height * width
         # tau = 5
         self.tau = tau
         self.states = ['residual', 'normal']
         if not self.cell_mode in self.states:
             raise AssertionError
         self.conv_t = nn.Sequential(
-            nn.Conv2d(in_channel, 3 * num_hidden, kernel_size=filter_size, stride=stride, padding=self.padding,
+            nn.Conv2d(in_channel * 4 , 3 * num_hidden * 4, kernel_size=filter_size, stride=stride, padding=self.padding,
                       ),
-            nn.LayerNorm([3 * num_hidden, height, width])
+            nn.LayerNorm([3 * num_hidden * 4, height, width])
         )
         self.conv_t_next = nn.Sequential(
-            nn.Conv2d(in_channel, num_hidden, kernel_size=filter_size, stride=stride, padding=self.padding,
+            nn.Conv2d(in_channel * 4, num_hidden * 4, kernel_size=filter_size, stride=stride, padding=self.padding,
                       ),
-            nn.LayerNorm([num_hidden, height, width])
+            nn.LayerNorm([num_hidden * 4, height, width])
         )
         self.conv_s = nn.Sequential(
-            nn.Conv2d(num_hidden, 3 * num_hidden, kernel_size=filter_size, stride=stride, padding=self.padding,
+            nn.Conv2d(num_hidden * 4, 3 * num_hidden * 4, kernel_size=filter_size, stride=stride, padding=self.padding,
                       ),
-            nn.LayerNorm([3 * num_hidden, height, width])
+            nn.LayerNorm([3 * num_hidden * 4, height, width])
         )
         self.conv_s_next = nn.Sequential(
-            nn.Conv2d(num_hidden, num_hidden, kernel_size=filter_size, stride=stride, padding=self.padding,
+            nn.Conv2d(num_hidden * 4, num_hidden * 4, kernel_size=filter_size, stride=stride, padding=self.padding,
                       ),
-            nn.LayerNorm([num_hidden, height, width])
+            nn.LayerNorm([num_hidden * 4, height, width])
         )
         self.softmax = nn.Softmax(dim=0)
 
-    def forward(self, T_t, S_t, t_att, s_att, st_att):
+    def forward(self, T_t, S_t, t_att, s_att):
         # T_t => T(k,t-1) 当前时间特征
         # S_t => S(k-1,t) 当前空间特征
         # t_att => T(k,t-tau:t-1)
@@ -60,18 +60,7 @@ class MAUCell(nn.Module):
         weights_list = torch.stack(weights_list, dim=0)
         weights_list = torch.reshape(weights_list, (*weights_list.shape, 1, 1, 1))
         weights_list = self.softmax(weights_list)
-
-        # 计算注意分数权重
-        weights_list_st = []
-        for i in range(self.tau):
-            # tau = τ = 5
-            # qi的计算 当前空间特征卷积操作的结果 与 历史前τ个进行Hadamard乘积
-            weights_list_st.append((st_att[i] * s_next).sum(dim=(1, 2, 3)) / math.sqrt(self.d))
-        weights_list_st = torch.stack(weights_list_st, dim=0)
-        weights_list_st = torch.reshape(weights_list_st, (*weights_list_st.shape, 1, 1, 1))
-        weights_list_st = self.softmax(weights_list_st)
-
-        T_trend = t_att * weights_list + t_att * weights_list_st
+        T_trend = t_att * weights_list
         # T_trend = T_att 长期运动信息
         T_trend = T_trend.sum(dim=0)
         # t_att_gate = Uf 融合门
@@ -84,9 +73,9 @@ class MAUCell(nn.Module):
         # S_t 卷积一次 => U_s   S_concat shape=16 * 192 * 16 * 16
         S_concat = self.conv_s(S_t)
         # T_concat 一分为三 t_g, t_t, t_s shape= 16 * 64 * 16 * 16
-        t_g, t_t, t_s = torch.split(T_concat, self.num_hidden, dim=1)
+        t_g, t_t, t_s = torch.split(T_concat, self.num_hidden * 4, dim=1)
         # S_concat 一分为三 s_g, s_t, s_s shape= 16 * 64 * 16 * 16
-        s_g, s_t, s_s = torch.split(S_concat, self.num_hidden, dim=1)
+        s_g, s_t, s_s = torch.split(S_concat, self.num_hidden * 4, dim=1)
         # T_gate 为 U_t_1 第一分组
         T_gate = torch.sigmoid(t_g)
         # S_gate 为 U_s_1 第一分组

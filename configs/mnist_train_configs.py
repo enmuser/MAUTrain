@@ -53,4 +53,10 @@ def configs():
     parser.add_argument('--sampling_start_value', type=float, default=1.0)
     parser.add_argument('--sampling_changing_rate', type=float, default=0.00002)
     parser.add_argument('--sampling_distance', type=int, default=2)
+
+    parser.add_argument('--in_shape', default=[1, 1, 64, 64], type=list, nargs='*')
+    parser.add_argument('--hid_S', default=64, type=int)
+    parser.add_argument('--hid_T', default=256, type=int)
+    parser.add_argument('--N_S', default=4, type=int)
+    parser.add_argument('--N_T', default=8, type=int)
     return parser

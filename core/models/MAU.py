@@ -3,9 +3,12 @@ import torch.nn as nn
 from core.layers.MAUCell import MAUCell
 import math
 
+from core.models.Inception_decoder import Inception_decoder
+from core.models.Inception_encoder import Inception_encoder
+
 
 class RNN(nn.Module):
-    def __init__(self, num_layers, num_hidden, configs):
+    def __init__(self, num_layers, num_hidden, configs,incep_ker=[3,5,7,11], groups=8):
         super(RNN, self).__init__()
         self.configs = configs
         # patch_size = 1
@@ -122,6 +125,12 @@ class RNN(nn.Module):
         # channel => 2 -> 1
         self.conv_last_sr = nn.Conv2d(self.frame_channel * 2, self.frame_channel, kernel_size=1, stride=1, padding=0)
 
+        self.inception_encoder = Inception_encoder(tuple(configs.in_shape), configs.hid_S,
+                           configs.hid_T, configs.N_S, configs.N_T)
+
+        self.inception_decoder = Inception_decoder(tuple(configs.in_shape), configs.hid_S,
+                                                   configs.hid_T, configs.N_S, configs.N_T)
+
     def forward(self, frames, mask_true):
         # print('ok')
         # 1. frames 图片信息 16 * 20 * 1 * 64 * 64
@@ -139,13 +148,11 @@ class RNN(nn.Module):
         T_t = []
         T_pre = []
         S_pre = []
-        ST_pre = []
         x_gen = None
         # num_layers = 0, 1, 2, 3
         for layer_idx in range(self.num_layers):
             tmp_t = []
             tmp_s = []
-            tmp_st = []
             if layer_idx == 0:
                 # in_channel = 64
                 in_channel = self.num_hidden[layer_idx]
@@ -154,12 +161,10 @@ class RNN(nn.Module):
                 in_channel = self.num_hidden[layer_idx - 1]
             # tau= 5 : 0, 1, 2, 3, 4
             for i in range(self.tau):
-                tmp_t.append(torch.zeros([batch_size, in_channel, height, width]).to(self.configs.device))# 16 * 64 * 16 * 16
-                tmp_s.append(torch.zeros([batch_size, in_channel, height, width]).to(self.configs.device))# 16 * 64 * 16 * 16
-                tmp_st.append(torch.zeros([batch_size, in_channel, height, width]).to(self.configs.device))  # 16 * 64 * 16 * 16
+                tmp_t.append(torch.zeros([batch_size, in_channel * 4, height, width]).to(self.configs.device))# 16 * 64 * 16 * 16
+                tmp_s.append(torch.zeros([batch_size, in_channel * 4, height, width]).to(self.configs.device))# 16 * 64 * 16 * 16
             T_pre.append(tmp_t) # 4 * 5 * 16 * 64 * 16 * 16
             S_pre.append(tmp_s) # 4 * 5 * 16 * 64 * 16 * 16
-            ST_pre.append(tmp_st) # 4 * 5 * 16 * 64 * 16 * 16
         # total_length = 20,  0,1,2,3,......,16,17,18
         for t in range(self.configs.total_length - 1):
             # input_length = 10
@@ -191,9 +196,11 @@ class RNN(nn.Module):
                 # num_layers = 4
                 # 0, 1, 2, 3
                 for i in range(self.num_layers):
-                    zeros = torch.zeros([batch_size, self.num_hidden[i], height, width]).to(self.configs.device) # 16 * 64 * 16 * 16
+                    zeros = torch.zeros([batch_size, self.num_hidden[i] * 4, height, width]).to(self.configs.device) # 16 * 64 * 16 * 16
                     T_t.append(zeros)# 4 * 16 * 64 * 16 * 16
             S_t = frames_feature # 16 * 64 * 16 * 16
+            S_t = S_t.reshape(16, 1, 64, 16, 16)
+            S_t, skips = self.inception_encoder(S_t)
             # num_layers = 4
             # 0, 1, 2, 3
             for i in range(self.num_layers):
@@ -202,13 +209,10 @@ class RNN(nn.Module):
                 s_att = S_pre[i][-self.tau:]
                 s_att = torch.stack(s_att, dim=0) # 5 * 16 * 64 * 16 * 16
                 S_pre[i].append(S_t)
-                st_att = ST_pre[i][-self.tau:]
-                st_att = torch.stack(st_att, dim=0)
-                if t % self.configs.sampling_distance == 0:
-                    ST_pre[i].append(S_t)
-                T_t[i], S_t = self.cell_list[i](T_t[i], S_t, t_att, s_att, st_att)
+                T_t[i], S_t = self.cell_list[i](T_t[i], S_t, t_att, s_att)
                 T_pre[i].append(T_t[i])
             out = S_t
+            out = self.inception_decoder(out,skips)
             # out = self.merge(torch.cat([T_t[-1], S_t], dim=1))
             frames_feature_decoded = []
             for i in range(len(self.decoders)):
