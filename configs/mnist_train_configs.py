@@ -44,7 +44,7 @@ def configs():
     parser.add_argument('--snapshot_interval', type=int, default=1000)
     parser.add_argument('--num_save_samples', type=int, default=5)
     parser.add_argument('--n_gpu', type=int, default=1)
-    parser.add_argument('--pretrained_model', type=str, default='/kaggle/input/movingmnist/model.ckpt-77000')
+    parser.add_argument('--pretrained_model', type=str, default='/kaggle/input/movingmnist/model.ckpt-80000')
     parser.add_argument('--perforamnce_dir', type=str, default='/kaggle/working/MAUTrain/results/mau/')
     parser.add_argument('--save_dir', type=str, default='/kaggle/working/MAUTrain/checkpoints/mau/')
     parser.add_argument('--gen_frm_dir', type=str, default='/kaggle/working/MAUTrain/results/mau/')
