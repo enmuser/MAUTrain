@@ -36,7 +36,7 @@ def configs():
     parser.add_argument('--lr', type=float, default=1e-3)
     parser.add_argument('--lr_decay', type=float, default=0.90)
     parser.add_argument('--delay_interval', type=float, default=2000)
-    parser.add_argument('--batch_size', type=int, default=8)
+    parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--max_iterations', type=int, default=160000)
     parser.add_argument('--max_epoches', type=int, default=200000)
     parser.add_argument('--display_interval', type=int, default=1)
@@ -58,5 +58,5 @@ def configs():
     parser.add_argument('--hid_S', default=64, type=int)
     parser.add_argument('--hid_T', default=256, type=int)
     parser.add_argument('--N_S', default=4, type=int)
-    parser.add_argument('--N_T', default=8, type=int)
+    parser.add_argument('--N_T', default=4, type=int)
     return parser
