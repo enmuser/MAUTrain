@@ -11,7 +11,7 @@ pynvml.nvmlInit()
 # -----------------------------------------------------------------------------
 parser = argparse.ArgumentParser(description='MAU')
 parser.add_argument('--dataset', type=str, default='mnist')
-parser.add_argument('--is_train', type=str, default='False', required=False)
+parser.add_argument('--is_train', type=str, default='True', required=False)
 args_main = parser.parse_args()
 args_main.tied = True
 

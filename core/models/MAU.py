@@ -161,8 +161,8 @@ class RNN(nn.Module):
                 in_channel = self.num_hidden[layer_idx - 1]
             # tau= 5 : 0, 1, 2, 3, 4
             for i in range(self.tau):
-                tmp_t.append(torch.zeros([batch_size, in_channel * 4, height, width]).to(self.configs.device))# 16 * 64 * 16 * 16
-                tmp_s.append(torch.zeros([batch_size, in_channel * 4, height, width]).to(self.configs.device))# 16 * 64 * 16 * 16
+                tmp_t.append(torch.zeros([batch_size, in_channel * 1, height, width]).to(self.configs.device))# 16 * 64 * 16 * 16
+                tmp_s.append(torch.zeros([batch_size, in_channel * 1, height, width]).to(self.configs.device))# 16 * 64 * 16 * 16
             T_pre.append(tmp_t) # 4 * 5 * 16 * 64 * 16 * 16
             S_pre.append(tmp_s) # 4 * 5 * 16 * 64 * 16 * 16
         # total_length = 20,  0,1,2,3,......,16,17,18
@@ -196,7 +196,7 @@ class RNN(nn.Module):
                 # num_layers = 4
                 # 0, 1, 2, 3
                 for i in range(self.num_layers):
-                    zeros = torch.zeros([batch_size, self.num_hidden[i] * 4, height, width]).to(self.configs.device) # 16 * 64 * 16 * 16
+                    zeros = torch.zeros([batch_size, self.num_hidden[i] * 1, height, width]).to(self.configs.device) # 16 * 64 * 16 * 16
                     T_t.append(zeros)# 4 * 16 * 64 * 16 * 16
             S_t = frames_feature # 16 * 64 * 16 * 16
             S_t = S_t.reshape(batch_size, 1, 64, 16, 16)

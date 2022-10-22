@@ -14,31 +14,31 @@ class MAUCell(nn.Module):
         self.padding = (filter_size[0] // 2, filter_size[1] // 2)
         self.cell_mode = cell_mode
         # d = 64 * 16 * 16 = 16384
-        self.d = num_hidden * 4 * height * width
+        self.d = num_hidden * 1 * height * width
         # tau = 5
         self.tau = tau
         self.states = ['residual', 'normal']
         if not self.cell_mode in self.states:
             raise AssertionError
         self.conv_t = nn.Sequential(
-            nn.Conv2d(in_channel * 4 , 3 * num_hidden * 4, kernel_size=filter_size, stride=stride, padding=self.padding,
+            nn.Conv2d(in_channel * 1 , 3 * num_hidden * 1, kernel_size=filter_size, stride=stride, padding=self.padding,
                       ),
-            nn.LayerNorm([3 * num_hidden * 4, height, width])
+            nn.LayerNorm([3 * num_hidden * 1, height, width])
         )
         self.conv_t_next = nn.Sequential(
-            nn.Conv2d(in_channel * 4, num_hidden * 4, kernel_size=filter_size, stride=stride, padding=self.padding,
+            nn.Conv2d(in_channel * 1, num_hidden * 1, kernel_size=filter_size, stride=stride, padding=self.padding,
                       ),
-            nn.LayerNorm([num_hidden * 4, height, width])
+            nn.LayerNorm([num_hidden * 1, height, width])
         )
         self.conv_s = nn.Sequential(
-            nn.Conv2d(num_hidden * 4, 3 * num_hidden * 4, kernel_size=filter_size, stride=stride, padding=self.padding,
+            nn.Conv2d(num_hidden * 1, 3 * num_hidden * 1, kernel_size=filter_size, stride=stride, padding=self.padding,
                       ),
-            nn.LayerNorm([3 * num_hidden * 4, height, width])
+            nn.LayerNorm([3 * num_hidden * 1, height, width])
         )
         self.conv_s_next = nn.Sequential(
-            nn.Conv2d(num_hidden * 4, num_hidden * 4, kernel_size=filter_size, stride=stride, padding=self.padding,
+            nn.Conv2d(num_hidden * 1, num_hidden * 1, kernel_size=filter_size, stride=stride, padding=self.padding,
                       ),
-            nn.LayerNorm([num_hidden * 4, height, width])
+            nn.LayerNorm([num_hidden * 1, height, width])
         )
         self.softmax = nn.Softmax(dim=0)
 
@@ -73,9 +73,9 @@ class MAUCell(nn.Module):
         # S_t 卷积一次 => U_s   S_concat shape=16 * 192 * 16 * 16
         S_concat = self.conv_s(S_t)
         # T_concat 一分为三 t_g, t_t, t_s shape= 16 * 64 * 16 * 16
-        t_g, t_t, t_s = torch.split(T_concat, self.num_hidden * 4, dim=1)
+        t_g, t_t, t_s = torch.split(T_concat, self.num_hidden * 1, dim=1)
         # S_concat 一分为三 s_g, s_t, s_s shape= 16 * 64 * 16 * 16
-        s_g, s_t, s_s = torch.split(S_concat, self.num_hidden * 4, dim=1)
+        s_g, s_t, s_s = torch.split(S_concat, self.num_hidden * 1, dim=1)
         # T_gate 为 U_t_1 第一分组
         T_gate = torch.sigmoid(t_g)
         # S_gate 为 U_s_1 第一分组
