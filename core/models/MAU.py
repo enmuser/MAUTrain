@@ -3,9 +3,6 @@ import torch.nn as nn
 from core.layers.MAUCell import MAUCell
 import math
 
-from core.models.Inception_decoder import Inception_decoder
-from core.models.Inception_encoder import Inception_encoder
-
 
 class RNN(nn.Module):
     def __init__(self, num_layers, num_hidden, configs,incep_ker=[3,5,7,11], groups=8):
@@ -22,6 +19,8 @@ class RNN(nn.Module):
         self.tau = configs.tau
         self.cell_mode = configs.cell_mode
         self.states = ['recall', 'normal']
+        self.stack_extend = 16
+        self.stack_size = 4
         if not self.configs.model_mode in self.states:
             raise AssertionError
         cell_list = []
@@ -49,7 +48,7 @@ class RNN(nn.Module):
         encoder.add_module(name='encoder_t_conv{0}'.format(-1),
                            # frame_channel = 1, num_hidden = 64
                            module=nn.Conv2d(in_channels=self.frame_channel,
-                                            out_channels=self.num_hidden[0],
+                                            out_channels=self.stack_extend,
                                             stride=1,
                                             padding=0,
                                             kernel_size=1))
@@ -125,11 +124,6 @@ class RNN(nn.Module):
         # channel => 2 -> 1
         self.conv_last_sr = nn.Conv2d(self.frame_channel * 2, self.frame_channel, kernel_size=1, stride=1, padding=0)
 
-        self.inception_encoder = Inception_encoder(tuple(configs.in_shape), configs.hid_S,
-                           configs.hid_T, configs.N_S, configs.N_T)
-
-        self.inception_decoder = Inception_decoder(tuple(configs.in_shape), configs.hid_S,
-                                                   configs.hid_T, configs.N_S, configs.N_T)
 
     def forward(self, frames, mask_true):
         # print('ok')
@@ -166,6 +160,8 @@ class RNN(nn.Module):
             T_pre.append(tmp_t) # 4 * 5 * 16 * 64 * 16 * 16
             S_pre.append(tmp_s) # 4 * 5 * 16 * 64 * 16 * 16
         # total_length = 20,  0,1,2,3,......,16,17,18
+        countsize = 0
+        frames_stack = []
         for t in range(self.configs.total_length - 1):
             # input_length = 10
             if t < self.configs.input_length:
@@ -186,21 +182,30 @@ class RNN(nn.Module):
             # frames_feature = 16 * 1 * 64 * 64
             frames_feature = net
             frames_feature_encoded = []
-            for i in range(len(self.encoders)):
-                # 1. 16 * 1 * 64 * 64 -> 16 * 64 * 64 * 64 => frames_feature_encoded
-                # 2. 16 * 64 * 64 * 64 -> 16 * 64 * 32 * 32 => frames_feature_encoded
-                # 3. 16 * 64 * 32 * 32 -> 16 * 64 * 16 * 16 => frames_feature_encoded
-                frames_feature = self.encoders[i](frames_feature)
-                frames_feature_encoded.append(frames_feature)
+
             if t == 0:
                 # num_layers = 4
                 # 0, 1, 2, 3
                 for i in range(self.num_layers):
                     zeros = torch.zeros([batch_size, self.num_hidden[i] * 1, height, width]).to(self.configs.device) # 16 * 64 * 16 * 16
                     T_t.append(zeros)# 4 * 16 * 64 * 16 * 16
+
+            frames_stack.append(self.encoders[0](frames_feature))
+            if countsize <= 2:
+               next_frames.append(frames[:, t+1])
+               countsize += 1
+               continue
+            frames_stacked_get = frames_stack[-self.stack_size:]
+            frames_stacked_get = torch.cat(frames_stacked_get, dim=1)
+            frames_feature = frames_stacked_get.permute(0, 2, 1, 3).contiguous()
+            for i in range(1, len(self.encoders)):
+                # 1. 16 * 1 * 64 * 64 -> 16 * 64 * 64 * 64 => frames_feature_encoded
+                # 2. 16 * 64 * 64 * 64 -> 16 * 64 * 32 * 32 => frames_feature_encoded
+                # 3. 16 * 64 * 32 * 32 -> 16 * 64 * 16 * 16 => frames_feature_encoded
+                frames_feature = self.encoders[i](frames_feature)
+                frames_feature_encoded.append(frames_feature)
+
             S_t = frames_feature # 16 * 64 * 16 * 16
-            S_t = S_t.reshape(batch_size, 1, 64, 16, 16)
-            S_t, skips = self.inception_encoder(S_t)
             # num_layers = 4
             # 0, 1, 2, 3
             for i in range(self.num_layers):
@@ -212,7 +217,6 @@ class RNN(nn.Module):
                 T_t[i], S_t = self.cell_list[i](T_t[i], S_t, t_att, s_att)
                 T_pre[i].append(T_t[i])
             out = S_t
-            out = self.inception_decoder(out,skips)
             # out = self.merge(torch.cat([T_t[-1], S_t], dim=1))
             frames_feature_decoded = []
             for i in range(len(self.decoders)):
