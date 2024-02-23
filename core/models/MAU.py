@@ -181,8 +181,8 @@ class RNN(nn.Module):
                 net = mask_true[:, time_diff] * frames[:, t] + (1 - mask_true[:, time_diff]) * x_gen
             # frames_feature = 16 * 1 * 64 * 64
             frames_feature = net
-            frames_feature_encoded = []
-
+            frames_feature_encoded_h = []
+            frames_feature_encoded_w = []
             if t == 0:
                 # num_layers = 4
                 # 0, 1, 2, 3
@@ -197,15 +197,23 @@ class RNN(nn.Module):
                continue
             frames_stacked_get = frames_stack[-self.stack_size:]
             frames_stacked_get = torch.cat(frames_stacked_get, dim=1)
-            frames_feature = frames_stacked_get.permute(0, 2, 1, 3).contiguous()
+            frames_feature_h = frames_stacked_get.permute(0, 2, 1, 3).contiguous()
             for i in range(1, len(self.encoders)):
                 # 1. 16 * 1 * 64 * 64 -> 16 * 64 * 64 * 64 => frames_feature_encoded
                 # 2. 16 * 64 * 64 * 64 -> 16 * 64 * 32 * 32 => frames_feature_encoded
                 # 3. 16 * 64 * 32 * 32 -> 16 * 64 * 16 * 16 => frames_feature_encoded
-                frames_feature = self.encoders[i](frames_feature)
-                frames_feature_encoded.append(frames_feature)
+                frames_feature_h = self.encoders[i](frames_feature_h)
+                frames_feature_encoded_h.append(frames_feature_h)
 
-            S_t = frames_feature # 16 * 64 * 16 * 16
+            frames_feature_w = frames_stacked_get.permute(0, 3, 1, 2).contiguous()
+            for i in range(1, len(self.encoders)):
+                # 1. 16 * 1 * 64 * 64 -> 16 * 64 * 64 * 64 => frames_feature_encoded
+                # 2. 16 * 64 * 64 * 64 -> 16 * 64 * 32 * 32 => frames_feature_encoded
+                # 3. 16 * 64 * 32 * 32 -> 16 * 64 * 16 * 16 => frames_feature_encoded
+                frames_feature_w = self.encoders[i](frames_feature_w)
+                frames_feature_encoded_w.append(frames_feature_w)
+
+            S_t = frames_feature_h + frames_feature_w # 16 * 64 * 16 * 16
             # num_layers = 4
             # 0, 1, 2, 3
             for i in range(self.num_layers):
@@ -224,7 +232,7 @@ class RNN(nn.Module):
                 # 2. 16 * 64 * 32 * 32 -> 16 * 64 * 64 * 64
                 out = self.decoders[i](out)
                 if self.configs.model_mode == 'recall':
-                    out = out + frames_feature_encoded[-2 - i]
+                    out = out + frames_feature_encoded_h[-2 - i] +frames_feature_encoded_w[-2 - i]
 
             x_gen = self.srcnn(out) # 16 * 64 * 64 * 64 => # 16 * 1 * 64 * 64
             next_frames.append(x_gen)
