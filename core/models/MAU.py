@@ -72,6 +72,64 @@ class RNN(nn.Module):
             encoders.append(encoder)
         self.encoders = nn.ModuleList(encoders)
 
+        encoders_h = []
+        encoder_h = nn.Sequential()
+        encoder_h.add_module(name='encoder_t_conv{0}'.format(-1),
+                           # frame_channel = 1, num_hidden = 64
+                           module=nn.Conv2d(in_channels=self.frame_channel,
+                                            out_channels=self.stack_extend,
+                                            stride=1,
+                                            padding=0,
+                                            kernel_size=1))
+        encoder_h.add_module(name='relu_t_{0}'.format(-1),
+                           module=nn.LeakyReLU(0.2))
+        encoders_h.append(encoder_h)
+        for i in range(n):
+            # 每次图片大小减掉一倍
+            encoder_h = nn.Sequential()
+            encoder_h.add_module(name='encoder_t{0}'.format(i),
+                               # in_channels = 64, out_channels = 64, stride = (2,2),padding = (1,1), kernel_size= (3,3)
+                               # outshape = 每次图片大小减掉一半
+                               module=nn.Conv2d(in_channels=self.num_hidden[0],
+                                                out_channels=self.num_hidden[0],
+                                                stride=(2, 2),
+                                                padding=(1, 1),
+                                                kernel_size=(3, 3)
+                                                ))
+            encoder_h.add_module(name='encoder_t_relu{0}'.format(i),
+                               module=nn.LeakyReLU(0.2))
+            encoders_h.append(encoder_h)
+        self.encoders_h = nn.ModuleList(encoders_h)
+
+        encoders_w = []
+        encoder_w = nn.Sequential()
+        encoder_w.add_module(name='encoder_t_conv{0}'.format(-1),
+                           # frame_channel = 1, num_hidden = 64
+                           module=nn.Conv2d(in_channels=self.frame_channel,
+                                            out_channels=self.stack_extend,
+                                            stride=1,
+                                            padding=0,
+                                            kernel_size=1))
+        encoder_w.add_module(name='relu_t_{0}'.format(-1),
+                           module=nn.LeakyReLU(0.2))
+        encoders_w.append(encoder_w)
+        for i in range(n):
+            # 每次图片大小减掉一倍
+            encoder_w = nn.Sequential()
+            encoder_w.add_module(name='encoder_t{0}'.format(i),
+                               # in_channels = 64, out_channels = 64, stride = (2,2),padding = (1,1), kernel_size= (3,3)
+                               # outshape = 每次图片大小减掉一半
+                               module=nn.Conv2d(in_channels=self.num_hidden[0],
+                                                out_channels=self.num_hidden[0],
+                                                stride=(2, 2),
+                                                padding=(1, 1),
+                                                kernel_size=(3, 3)
+                                                ))
+            encoder_w.add_module(name='encoder_t_relu{0}'.format(i),
+                               module=nn.LeakyReLU(0.2))
+            encoders_w.append(encoder_w)
+        self.encoders_w = nn.ModuleList(encoders_w)
+
         # Decoder
         decoders = []
 
@@ -115,6 +173,92 @@ class RNN(nn.Module):
             decoders.append(decoder)
         self.decoders = nn.ModuleList(decoders)
 
+        decoders_w = []
+
+        # n = 2
+        for i in range(n - 1):
+            # 每次图片大小增加一倍
+            # H_in = 16
+            # W_in = 16
+            # stride = (2, 2)
+            # padding = (1, 1)
+            # kernel_size = (3, 3)
+            # output_padding = (1, 1)
+            # dilation 默认 = 1
+            # 基于转置卷积的计算公式
+            # H_out = (16 - 1) * 2 - 2 * 1 + 1 * (3 - 1) + 1 + 1 = 32 - 2 - 2 + 2 + 2 = 32
+            # W_out = (16 - 1) * 2 - 2 * 1 + 1 * (3 - 1) + 1 + 1 = 32 - 2 - 2 + 2 + 2 = 32
+            # 大小扩充一倍的上采样
+            decoder_w = nn.Sequential()
+            decoder_w.add_module(name='c_decoder{0}'.format(i),
+                               module=nn.ConvTranspose2d(in_channels=self.num_hidden[-1],
+                                                         out_channels=self.num_hidden[-1],
+                                                         stride=(2, 2),
+                                                         padding=(1, 1),
+                                                         kernel_size=(3, 3),
+                                                         output_padding=(1, 1)
+                                                         ))
+            decoder_w.add_module(name='c_decoder_relu{0}'.format(i),
+                               module=nn.LeakyReLU(0.2))
+            decoders_w.append(decoder_w)
+
+        if n > 0:
+            decoder_w = nn.Sequential()
+            decoder_w.add_module(name='c_decoder{0}'.format(n - 1),
+                               module=nn.ConvTranspose2d(in_channels=self.num_hidden[-1],
+                                                         out_channels=self.num_hidden[-1],
+                                                         stride=(2, 2),
+                                                         padding=(1, 1),
+                                                         kernel_size=(3, 3),
+                                                         output_padding=(1, 1)
+                                                         ))
+            decoders_w.append(decoder_w)
+        self.decoders_w = nn.ModuleList(decoders_w)
+
+        decoders_h = []
+
+        # n = 2
+        for i in range(n - 1):
+            # 每次图片大小增加一倍
+            # H_in = 16
+            # W_in = 16
+            # stride = (2, 2)
+            # padding = (1, 1)
+            # kernel_size = (3, 3)
+            # output_padding = (1, 1)
+            # dilation 默认 = 1
+            # 基于转置卷积的计算公式
+            # H_out = (16 - 1) * 2 - 2 * 1 + 1 * (3 - 1) + 1 + 1 = 32 - 2 - 2 + 2 + 2 = 32
+            # W_out = (16 - 1) * 2 - 2 * 1 + 1 * (3 - 1) + 1 + 1 = 32 - 2 - 2 + 2 + 2 = 32
+            # 大小扩充一倍的上采样
+            decoder_h = nn.Sequential()
+            decoder_h.add_module(name='c_decoder{0}'.format(i),
+                               module=nn.ConvTranspose2d(in_channels=self.num_hidden[-1],
+                                                         out_channels=self.num_hidden[-1],
+                                                         stride=(2, 2),
+                                                         padding=(1, 1),
+                                                         kernel_size=(3, 3),
+                                                         output_padding=(1, 1)
+                                                         ))
+            decoder_h.add_module(name='c_decoder_relu{0}'.format(i),
+                               module=nn.LeakyReLU(0.2))
+            decoders_h.append(decoder_h)
+
+        if n > 0:
+            decoder_h = nn.Sequential()
+            decoder_h.add_module(name='c_decoder{0}'.format(n - 1),
+                               module=nn.ConvTranspose2d(in_channels=self.num_hidden[-1],
+                                                         out_channels=self.num_hidden[-1],
+                                                         stride=(2, 2),
+                                                         padding=(1, 1),
+                                                         kernel_size=(3, 3),
+                                                         output_padding=(1, 1)
+                                                         ))
+            decoders_h.append(decoder_h)
+        self.decoders_h = nn.ModuleList(decoders_h)
+
+
+
         # channel => 64 -> 1
         self.srcnn = nn.Sequential(
             nn.Conv2d(self.num_hidden[-1], self.frame_channel, kernel_size=1, stride=1, padding=0)
@@ -123,6 +267,45 @@ class RNN(nn.Module):
         self.merge = nn.Conv2d(self.num_hidden[-1] * 2, self.num_hidden[-1], kernel_size=1, stride=1, padding=0)
         # channel => 2 -> 1
         self.conv_last_sr = nn.Conv2d(self.frame_channel * 2, self.frame_channel, kernel_size=1, stride=1, padding=0)
+
+        merger_coders = []
+        merger_coder_one = nn.Sequential()
+        merger_coder_one.add_module(name='merger_coder_one_conv{0}'.format(-1),
+                           # frame_channel = 1, num_hidden = 64
+                           module=nn.Conv2d(in_channels=64,
+                                            out_channels=64,
+                                            stride=1,
+                                            padding=0,
+                                            kernel_size=1))
+        merger_coder_one.add_module(name='merger_coder_one_relu_t_{0}'.format(-1),
+                           module=nn.LeakyReLU(0.2))
+
+        merger_coders.append(merger_coder_one)
+        merger_coder_two = nn.Sequential()
+        merger_coder_two.add_module(name='merger_coder_two_conv{0}'.format(-1),
+                           # frame_channel = 1, num_hidden = 64
+                           module=nn.Conv2d(in_channels=64,
+                                            out_channels=64,
+                                            stride=1,
+                                            padding=0,
+                                            kernel_size=1))
+        merger_coder_two.add_module(name='merger_coder_two_relu_{0}'.format(-1),
+                           module=nn.LeakyReLU(0.2))
+        merger_coders.append(merger_coder_two)
+
+        merger_coder_three = nn.Sequential()
+        merger_coder_three.add_module(name='merger_coder_two_conv{0}'.format(-1),
+                                    # frame_channel = 1, num_hidden = 64
+                                    module=nn.Conv2d(in_channels=64,
+                                                     out_channels=64,
+                                                     stride=1,
+                                                     padding=0,
+                                                     kernel_size=1))
+        merger_coder_three.add_module(name='merger_coder_two_relu_{0}'.format(-1),
+                                    module=nn.LeakyReLU(0.2))
+        merger_coders.append(merger_coder_three)
+
+        self.merger_coders = nn.ModuleList(merger_coders)
 
 
     def forward(self, frames, mask_true):
@@ -142,11 +325,21 @@ class RNN(nn.Module):
         T_t = []
         T_pre = []
         S_pre = []
+        T_t_h = []
+        T_pre_h = []
+        S_pre_h = []
+        T_t_w = []
+        T_pre_w = []
+        S_pre_w = []
         x_gen = None
         # num_layers = 0, 1, 2, 3
         for layer_idx in range(self.num_layers):
             tmp_t = []
             tmp_s = []
+            tmp_t_h = []
+            tmp_s_h = []
+            tmp_t_w = []
+            tmp_s_w = []
             if layer_idx == 0:
                 # in_channel = 64
                 in_channel = self.num_hidden[layer_idx]
@@ -157,8 +350,16 @@ class RNN(nn.Module):
             for i in range(self.tau):
                 tmp_t.append(torch.zeros([batch_size, in_channel * 1, height, width]).to(self.configs.device))# 16 * 64 * 16 * 16
                 tmp_s.append(torch.zeros([batch_size, in_channel * 1, height, width]).to(self.configs.device))# 16 * 64 * 16 * 16
+                tmp_t_h.append(torch.zeros([batch_size, in_channel * 1, height, width]).to(self.configs.device))  # 16 * 64 * 16 * 16
+                tmp_s_h.append(torch.zeros([batch_size, in_channel * 1, height, width]).to(self.configs.device))  # 16 * 64 * 16 * 16
+                tmp_t_w.append(torch.zeros([batch_size, in_channel * 1, height, width]).to(self.configs.device))  # 16 * 64 * 16 * 16
+                tmp_s_w.append(torch.zeros([batch_size, in_channel * 1, height, width]).to(self.configs.device))  # 16 * 64 * 16 * 16
             T_pre.append(tmp_t) # 4 * 5 * 16 * 64 * 16 * 16
             S_pre.append(tmp_s) # 4 * 5 * 16 * 64 * 16 * 16
+            T_pre_h.append(tmp_t_h)  # 4 * 5 * 16 * 64 * 16 * 16
+            S_pre_h.append(tmp_s_h)  # 4 * 5 * 16 * 64 * 16 * 16
+            T_pre_w.append(tmp_t_w)  # 4 * 5 * 16 * 64 * 16 * 16
+            S_pre_w.append(tmp_s_w)  # 4 * 5 * 16 * 64 * 16 * 16
         # total_length = 20,  0,1,2,3,......,16,17,18
         countsize = 0
         frames_stack = []
@@ -181,14 +382,19 @@ class RNN(nn.Module):
                 net = mask_true[:, time_diff] * frames[:, t] + (1 - mask_true[:, time_diff]) * x_gen
             # frames_feature = 16 * 1 * 64 * 64
             frames_feature = net
+            frames_feature_encoded_h = []
+            frames_feature_encoded_w = []
             frames_feature_encoded = []
-
             if t == 0:
                 # num_layers = 4
                 # 0, 1, 2, 3
                 for i in range(self.num_layers):
                     zeros = torch.zeros([batch_size, self.num_hidden[i] * 1, height, width]).to(self.configs.device) # 16 * 64 * 16 * 16
                     T_t.append(zeros)# 4 * 16 * 64 * 16 * 16
+                    zeros = torch.zeros([batch_size, self.num_hidden[i] * 1, height, width]).to(self.configs.device)  # 16 * 64 * 16 * 16
+                    T_t_h.append(zeros)  # 4 * 16 * 64 * 16 * 16
+                    zeros = torch.zeros([batch_size, self.num_hidden[i] * 1, height, width]).to(self.configs.device)  # 16 * 64 * 16 * 16
+                    T_t_w.append(zeros)  # 4 * 16 * 64 * 16 * 16
 
             frames_stack.append(self.encoders[0](frames_feature))
             if countsize <= 2:
@@ -197,15 +403,65 @@ class RNN(nn.Module):
                continue
             frames_stacked_get = frames_stack[-self.stack_size:]
             frames_stacked_get = torch.cat(frames_stacked_get, dim=1)
-            frames_feature = frames_stacked_get.permute(0, 2, 1, 3).contiguous()
+            frames_feature_h = frames_stacked_get.permute(0, 2, 1, 3).contiguous()
+            for i in range(1, len(self.encoders_h)):
+                # 1. 16 * 1 * 64 * 64 -> 16 * 64 * 64 * 64 => frames_feature_encoded
+                # 2. 16 * 64 * 64 * 64 -> 16 * 64 * 32 * 32 => frames_feature_encoded
+                # 3. 16 * 64 * 32 * 32 -> 16 * 64 * 16 * 16 => frames_feature_encoded
+                frames_feature_h = self.encoders_h[i](frames_feature_h)
+                frames_feature_encoded_h.append(frames_feature_h)
+            S_t_h = frames_feature_h
+            for i in range(self.num_layers):
+                t_att_h = T_pre_h[i][-self.tau:] #
+                t_att_h = torch.stack(t_att_h, dim=0) # 5 * 16 * 64 * 16 * 16
+                s_att_h = S_pre_h[i][-self.tau:]
+                s_att_h = torch.stack(s_att_h, dim=0) # 5 * 16 * 64 * 16 * 16
+                S_pre_h[i].append(S_t_h)
+                T_t_h[i], S_t_h = self.cell_list[i](T_t_h[i], S_t_h, t_att_h, s_att_h)
+                T_pre_h[i].append(T_t_h[i])
+            out_h = S_t_h
+            # out = self.merge(torch.cat([T_t[-1], S_t], dim=1))
+            frames_feature_decoded = []
+            for i in range(len(self.decoders_h)):
+                # 1. 16 * 64 * 16 * 16 -> 16 * 64 * 32 * 32
+                # 2. 16 * 64 * 32 * 32 -> 16 * 64 * 64 * 64
+                out_h = self.decoders_h[i](out_h)
+
+
+            frames_feature_w = frames_stacked_get.permute(0, 3, 1, 2).contiguous()
+            for i in range(1, len(self.encoders_w)):
+                # 1. 16 * 1 * 64 * 64 -> 16 * 64 * 64 * 64 => frames_feature_encoded
+                # 2. 16 * 64 * 64 * 64 -> 16 * 64 * 32 * 32 => frames_feature_encoded
+                # 3. 16 * 64 * 32 * 32 -> 16 * 64 * 16 * 16 => frames_feature_encoded
+                frames_feature_w = self.encoders_w[i](frames_feature_w)
+                frames_feature_encoded_w.append(frames_feature_w)
+            S_t_w = frames_feature_w
+            for i in range(self.num_layers):
+                t_att_w = T_pre_w[i][-self.tau:] #
+                t_att_w = torch.stack(t_att_w, dim=0) # 5 * 16 * 64 * 16 * 16
+                s_att_w = S_pre_w[i][-self.tau:]
+                s_att_w = torch.stack(s_att_w, dim=0) # 5 * 16 * 64 * 16 * 16
+                S_pre_w[i].append(S_t_w)
+                T_t_w[i], S_t_w = self.cell_list[i](T_t_w[i], S_t_w, t_att_w, s_att_w)
+                T_pre_w[i].append(T_t_w[i])
+
+            out_w = S_t_w
+            # out = self.merge(torch.cat([T_t[-1], S_t], dim=1))
+            frames_feature_decoded = []
+            for i in range(len(self.decoders_w)):
+                # 1. 16 * 64 * 16 * 16 -> 16 * 64 * 32 * 32
+                # 2. 16 * 64 * 32 * 32 -> 16 * 64 * 64 * 64
+                out_w = self.decoders_w[i](out_w)
+
+
             for i in range(1, len(self.encoders)):
                 # 1. 16 * 1 * 64 * 64 -> 16 * 64 * 64 * 64 => frames_feature_encoded
                 # 2. 16 * 64 * 64 * 64 -> 16 * 64 * 32 * 32 => frames_feature_encoded
                 # 3. 16 * 64 * 32 * 32 -> 16 * 64 * 16 * 16 => frames_feature_encoded
-                frames_feature = self.encoders[i](frames_feature)
-                frames_feature_encoded.append(frames_feature)
+                frames_stacked_get = self.encoders[i](frames_stacked_get)
+                frames_feature_encoded.append(frames_stacked_get)
 
-            S_t = frames_feature # 16 * 64 * 16 * 16
+            S_t = frames_stacked_get# 16 * 64 * 16 * 16
             # num_layers = 4
             # 0, 1, 2, 3
             for i in range(self.num_layers):
@@ -223,10 +479,10 @@ class RNN(nn.Module):
                 # 1. 16 * 64 * 16 * 16 -> 16 * 64 * 32 * 32
                 # 2. 16 * 64 * 32 * 32 -> 16 * 64 * 64 * 64
                 out = self.decoders[i](out)
-                if self.configs.model_mode == 'recall':
-                    out = out + frames_feature_encoded[-2 - i]
-
-            x_gen = self.srcnn(out) # 16 * 64 * 64 * 64 => # 16 * 1 * 64 * 64
+                # if self.configs.model_mode == 'recall':
+                #     out = out + frames_feature_encoded_h[-2 - i] +frames_feature_encoded_w[-2 - i]
+            out_all = self.merger_coders[0](out_h) + self.merger_coders[0](out_w) + out
+            x_gen = self.srcnn(out_all) # 16 * 64 * 64 * 64 => # 16 * 1 * 64 * 64
             next_frames.append(x_gen)
         next_frames = torch.stack(next_frames, dim=0).permute(1, 0, 2, 3, 4).contiguous()
         return next_frames # 16 * 19 * 1 * 64 * 64
